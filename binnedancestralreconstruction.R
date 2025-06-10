@@ -8,32 +8,6 @@ library(ape)       # Used for working with phylogenetic trees
 library(geiger)    # Provides functions for evolutionary biology analysis
 library(phytools)  # Additional tools for manipulating and analyzing phylogenetic trees
 library(plotrix)   # Required for floating.pie function
-library(viridis)   # For better color palettes
-library(ggplot2)   # For enhanced visualization capabilities
-
-# Enhanced error handling function (commented out for now)
-# validate_input_data <- function(occ_list, m_list, temp, tree) {
-#   # Check if all required data is present
-#   if (is.null(occ_list)) stop("Species occurrence data is missing")
-#   if (is.null(m_list)) stop("Niche model data is missing")
-#   if (is.null(temp)) stop("Temperature data is missing")
-#   if (is.null(tree)) stop("Phylogenetic tree is missing")
-#   
-#   # Check data structure
-#   if (!all(c("species", "x", "y") %in% names(occ_list))) {
-#     stop("Occurrence data must contain 'species', 'x', and 'y' columns")
-#   }
-#   
-#   # Check for missing values
-#   if (any(is.na(occ_list))) {
-#     warning("Missing values found in occurrence data")
-#   }
-#   
-#   # Validate tree structure
-#   if (!inherits(tree, "phylo")) {
-#     stop("Tree must be a phylogenetic tree object")
-#   }
-# }
 
 # Load species occurrence data from the 'nichevol' package
 data("occ_list", package = "nichevol")
@@ -53,13 +27,6 @@ temp <- rast(system.file("extdata", "temp.tif", package = "nichevol"))
 # Load a phylogenetic tree dataset that represents evolutionary relationships between species
 data("tree", package = "nichevol")
 
-# Enhanced color palette using viridis
-color_palette <- viridis::viridis(20, option = "plasma")
-# Alternative color palettes
-color_palette <- viridis::magma(20)
-color_palette <- viridis::inferno(20)
-color_palette <- colorRampPalette(c("darkblue", "blue", "green", "yellow", "red", "darkred"))(20)
-
 # Generate a table dividing temperature data into bins (ranges) for each species
 # This allows for a more structured comparison of environmental conditions
 bin_tabl <- bin_table(Ms = m_list, occurrences = occ_list, species = "species", 
@@ -78,6 +45,10 @@ table_ml_rec <- bin_ml_rec(tree_data)
 
 # Apply smoothing to Maximum Likelihood results to make trends clearer
 s_ml_rec_table <- smooth_rec(table_ml_rec)
+
+# Create a color palette for the pie charts
+# We'll use a color gradient from cool to warm temperatures
+color_palette <- colorRampPalette(c("blue", "green", "yellow", "red"))(20)
 
 # Function to convert bin probabilities to pie chart data
 create_pie_data <- function(node_data) {
@@ -101,121 +72,123 @@ s_ml_rec_matrix[is.na(s_ml_rec_matrix)] <- 0
 tip_pies <- t(apply(bin_tabl_matrix, 1, create_pie_data))
 node_pies <- t(apply(s_ml_rec_matrix, 1, create_pie_data))
 
-# Enhanced visualization with better formatting
+# Create the first visualization (pie chart tree)
 png("ancestral_reconstruction_visualization.png", width = 1200, height = 800, res = 100)
 
-# Set up the plot with better margins
-par(mar = c(5, 4, 4, 8))
-
-# Plot the tree with enhanced formatting
+# Plot the tree and get the coordinates
 tree_plot <- plot.phylo(tree, label.offset = 0.04, type = "phylogram", 
-                        direction = "rightwards", show.tip.label = TRUE, 
-                        cex = 0.7, edge.width = 2)
-
-# Get coordinates
+                        direction = "rightwards", show.tip.label = TRUE, cex = 0.7)
+# Get the coordinates of the tips and nodes
 lastPP <- get("last_plot.phylo", envir = .PlotPhyloEnv)
 
-# Add pie charts at tips with enhanced formatting
+# Add pie charts at tips
 for(i in 1:nrow(tip_pies)) {
   x <- lastPP$xx[i]
   y <- lastPP$yy[i]
-  plotrix::floating.pie(x, y, tip_pies[i,], radius = 0.05, 
-                       col = color_palette, border = "white", lwd = 0.5)
+  plotrix::floating.pie(x, y, tip_pies[i,], radius = 0.05, col = color_palette, border = "white")
 }
 
-# Add pie charts at nodes with enhanced formatting
+# Add pie charts at nodes (internal nodes)
 for(i in 1:nrow(node_pies)) {
   x <- lastPP$xx[length(tree$tip.label) + i]
   y <- lastPP$yy[length(tree$tip.label) + i]
-  plotrix::floating.pie(x, y, node_pies[i,], radius = 0.05, 
-                       col = color_palette, border = "white", lwd = 0.5)
+  plotrix::floating.pie(x, y, node_pies[i,], radius = 0.05, col = color_palette, border = "white")
 }
 
-# Enhanced legend with better formatting
-legend("right", 
+# Add a legend
+legend("bottomright", 
        legend = paste("Bin", 1:20),
        fill = color_palette,
        cex = 0.6,
-       ncol = 2,
-       title = "Temperature Bins",
-       bty = "n",
-       xpd = TRUE,
-       inset = c(-0.2, 0))
+       ncol = 4,
+       title = "Temperature Bins")
 
-# Add title and subtitle
-title(main = "Ancestral Reconstruction of Temperature Niches",
-      sub = "Maximum Likelihood Estimation with Enhanced Visualization",
-      cex.main = 1.2,
-      cex.sub = 0.8)
+# Add a title
+title("Ancestral Reconstruction of Temperature Niches\nwith Maximum Likelihood Estimation")
 
 dev.off()
 
-# Print confirmation messages
-cat("\nEnhanced visualizations have been created:\n")
-cat("1. ancestral_reconstruction_visualization.png\n")
+# Print confirmation message
+cat("\nVisualization has been created:\n")
+cat("ancestral_reconstruction_visualization.png\n")
 
 # Calculate a continuous trait value for each tip and node (e.g., weighted mean of bins)
 get_trait_value <- function(row) {
   bins <- as.numeric(row)
   bins[is.na(bins)] <- 0
+  # Avoid division by zero
+  if(sum(bins) == 0) return(NA)
   # Weighted mean: bin index * probability
   sum(bins * seq_along(bins)) / sum(bins)
 }
 
 # For tips
 tip_trait <- apply(bin_tabl_matrix, 1, get_trait_value)
-# For nodes (ancestral)
-node_trait <- apply(s_ml_rec_matrix, 1, get_trait_value)
 
-# Combine tip and node values for the tree
-trait_vector <- numeric(length(tree$tip.label) + tree$Nnode)
-trait_vector[1:length(tree$tip.label)] <- tip_trait
-trait_vector[(length(tree$tip.label)+1):(length(tree$tip.label)+tree$Nnode)] <- node_trait
+# Check for NAs in tip_trait and handle them
+if(any(is.na(tip_trait))) {
+  cat("Warning: Some tip trait values are NA. Replacing with mean value.\n")
+  tip_trait[is.na(tip_trait)] <- mean(tip_trait, na.rm = TRUE)
+}
 
-# Enhanced continuous trait visualization
-png("ancestral_state_contmap.png", width = 1200, height = 800, res = 100)
+# Make sure tip_trait is a named vector
+names(tip_trait) <- tree$tip.label
 
-# Set up the plot with better margins
-par(mar = c(5, 4, 4, 8))
+# Debug: Print some information
+cat("\nDebugging information:\n")
+cat("Number of tips:", length(tree$tip.label), "\n")
+cat("Length of tip_trait:", length(tip_trait), "\n")
+cat("Range of tip_trait:", range(tip_trait, na.rm = TRUE), "\n")
+cat("Any NAs in tip_trait:", any(is.na(tip_trait)), "\n")
 
-# Create and plot the continuous trait map with enhanced formatting
-contmap_obj <- phytools::contMap(tree, tip_trait, plot=FALSE)
-# Set the color palette for the contMap
-contmap_obj$cols <- viridis::viridis(1000)  # Using more color gradations for smoother transitions
-
-# Plot the contMap with enhanced formatting
-plot(contmap_obj, 
-     legend=0.7*max(nodeHeights(tree)), 
-     fsize=0.5, 
-     outline=FALSE,
-     lwd=2,
-     type="fan",  # Changed to fan type for better visualization
-     sig=2)       # Added significance level
-
-# Add title and subtitle
-title(main = "Ancestral State Reconstruction: Temperature",
-      sub = "Continuous Trait Evolution with Enhanced Visualization",
-      cex.main = 1.2,
-      cex.sub = 0.8)
-
-dev.off()
-
-cat("\nEnhanced visualizations have been created:\n")
-cat("2. ancestral_state_contmap.png\n")
-
-# Data format validation function (commented out)
-# validate_data_format <- function(data, expected_format) {
-#   if (!inherits(data, expected_format)) {
-#     stop(sprintf("Data must be of class %s", expected_format))
-#   }
-# }
-
-# Missing data handling function (commented out)
-# handle_missing_data <- function(data) {
-#   if (any(is.na(data))) {
-#     warning("Missing values detected in data")
-#     # Implement appropriate handling strategy
-#     # data <- na.omit(data)  # or other appropriate method
-#   }
-#   return(data)
-# }
+# Try to create the contMap object with error handling
+tryCatch({
+  cat("\nAttempting to create contMap object...\n")
+  contmap_obj <- phytools::contMap(tree, tip_trait, plot=FALSE)
+  cat("contMap object created successfully!\n")
+  
+  # Save the plot as a PNG
+  png("ancestral_state_contmap.png", width = 1200, height = 800, res = 100)
+  plot(contmap_obj, legend=0.7*max(nodeHeights(tree)), fsize=0.5, outline=FALSE)
+  title("Ancestral State Reconstruction: Temperature")
+  dev.off()
+  
+  cat("\ncontMap-style visualization has been created:\n")
+  cat("ancestral_state_contmap.png\n")
+  
+}, error = function(e) {
+  cat("Error creating contMap:\n")
+  cat(e$message, "\n")
+  
+  # Alternative approach using a simpler method
+  cat("\nTrying alternative approach with ace() function...\n")
+  
+  # Use ace() for ancestral state estimation
+  ace_result <- ape::ace(tip_trait, tree, type = "continuous")
+  
+  # Create a simple color-coded tree plot
+  png("ancestral_state_alternative.png", width = 1200, height = 800, res = 100)
+  
+  # Plot tree with branch colors based on trait values
+  plot(tree, show.tip.label = TRUE, cex = 0.7)
+  
+  # Add colored points at tips based on trait values
+  tip_colors <- heat.colors(100)[as.numeric(cut(tip_trait, breaks = 100))]
+  tiplabels(pch = 21, bg = tip_colors, cex = 1.5)
+  
+  # Add colored points at nodes based on ancestral estimates
+  node_colors <- heat.colors(100)[as.numeric(cut(ace_result$ace, breaks = 100))]
+  nodelabels(pch = 21, bg = node_colors, cex = 1.2)
+  
+  title("Ancestral State Reconstruction: Temperature (Alternative Method)")
+  
+  # Add a simple legend
+  legend("bottomright", 
+         legend = c("Low Temp", "High Temp"),
+         fill = c("red", "yellow"),
+         title = "Temperature")
+  
+  dev.off()
+  
+  cat("Alternative visualization created: ancestral_state_alternative.png\n")
+})
