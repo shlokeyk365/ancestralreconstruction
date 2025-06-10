@@ -8,10 +8,10 @@ library(plotrix)
 library(viridis)
 library(ggplot2)
 
-# Create output directory if it doesn't exist
+# gives us an output directory if we don't already have one
 dir.create("newfolder/plots", showWarnings = FALSE)
 
-# Load original nichevol data
+# load nichevol data
 data("occ_list", package = "nichevol")
 data("tree", package = "nichevol")
 
@@ -22,7 +22,7 @@ m_list <- lapply(m_files, terra::vect)
 temp <- rast(system.file("extdata", "temp.tif", package = "nichevol"))
 
 # set up color palette
-n_bins_alt <- 10 # Changed number of bins
+n_bins_alt <- 10 # Changed number of bins from 20 to 10
 color_palette <- viridis::viridis(n_bins_alt, option = "plasma")
 
 # create temperature bins for each species with the new number of bins
@@ -30,26 +30,25 @@ bin_tabl <- bin_table(Ms = m_list, occurrences = occ_list, species = "species",
                       longitude = "x", latitude = "y", variable = temp, 
                       percentage_out = 5, n_bins = n_bins_alt)
 
-# match tree tip labels to data
+# tree tip label to data matching 
 tree$tip.label <- rownames(bin_tabl)
 tree <- ladderize(tree)
 
-# combine tree and environmental data
+# tree and environmental data combination
 tree_data <- geiger::treedata(tree, bin_tabl)
 
 # ancestral reconstruction using maximum likelihood
 table_ml_rec <- bin_ml_rec(tree_data)
 s_ml_rec_table <- smooth_rec(table_ml_rec)
 
-# function to convert bin probabilities to pie chart data
+#convert bin probabilities to pie chart data
 create_pie_data <- function(node_data) {
   node_data <- as.numeric(node_data)
   node_data[is.na(node_data)] <- 0
   probs <- node_data / sum(node_data)
   return(probs)
 }
-
-# prepare pie chart data
+# pie chart data preparation
 bin_tabl_matrix <- as.matrix(bin_tabl)
 s_ml_rec_matrix <- as.matrix(s_ml_rec_table)
 
@@ -58,8 +57,7 @@ s_ml_rec_matrix[is.na(s_ml_rec_matrix)] <- 0
 
 tip_pies <- t(apply(bin_tabl_matrix, 1, create_pie_data))
 node_pies <- t(apply(s_ml_rec_matrix, 1, create_pie_data))
-
-# create pie chart visualization
+# p[ie chart visualization
 png("newfolder/plots/ancestral_reconstruction_visualization_alt.png", width = 1200, height = 800, res = 100)
 
 par(mar = c(5, 4, 4, 8))
@@ -70,15 +68,13 @@ tree_plot <- plot.phylo(tree, label.offset = 0.04, type = "phylogram",
 
 lastPP <- get("last_plot.phylo", envir = .PlotPhyloEnv)
 
-# add pie charts at tips
+# add pie charts at tips and nodes as well 
 for(i in 1:nrow(tip_pies)) {
   x <- lastPP$xx[i]
   y <- lastPP$yy[i]
   plotrix::floating.pie(x, y, tip_pies[i,], radius = 0.05,
                        col = color_palette, border = "white", lwd = 0.5)
 }
-
-# add pie charts at nodes
 for(i in 1:nrow(node_pies)) {
   x <- lastPP$xx[length(tree$tip.label) + i]
   y <- lastPP$yy[length(tree$tip.label) + i]
@@ -86,7 +82,7 @@ for(i in 1:nrow(node_pies)) {
                        col = color_palette, border = "white", lwd = 0.5)
 }
 
-# add legend
+# legend for visualizations
 legend("right",
        legend = paste("Bin", 1:n_bins_alt), # Adjusted for new number of bins
        fill = color_palette,
