@@ -1,15 +1,15 @@
-# Load necessary libraries for different functionalities
+# Load all of the  necessary libraries 
 if (!requireNamespace("plotrix", quietly = TRUE)) {
   install.packages("plotrix")
 }
-library(nichevol)  # Provides tools for ecological niche evolution analysis
-library(terra)     # Handles spatial and environmental data, such as temperature maps
-library(ape)       # Used for working with phylogenetic trees
-library(geiger)    # Provides functions for evolutionary biology analysis
-library(phytools)  # Additional tools for manipulating and analyzing phylogenetic trees
-library(plotrix)   # Required for floating.pie function
-library(viridis)   # For better color palettes
-library(ggplot2)   # For enhanced visualization capabilities
+library(nichevol) 
+library(terra)     
+library(ape)      
+library(geiger)    
+library(phytools)  
+library(plotrix)   
+library(viridis)   
+library(ggplot2)   
 
 # Enhanced error handling function (commented out for now)
 # validate_input_data <- function(occ_list, m_list, temp, tree) {
@@ -35,19 +35,19 @@ library(ggplot2)   # For enhanced visualization capabilities
 #   }
 # }
 
-# Load species occurrence data from the 'nichevol' package
+# load the species occurrence data from the 'nichevol' package
 data("occ_list", package = "nichevol")
 
-# Find all model files in the package's extdata folder that describe ecological niches
+# find all model files in the package's extdata folder that describe ecological niches
 m_files <- list.files(system.file("extdata", package = "nichevol"), 
                       pattern="m\\d.gpkg", full.names=TRUE)
 
-# Read these niche model files as spatial vector objects
-# These models define the regions accessible to species
+# Read these niche model files as spatial vector objects, define accessible regions to species
+
 m_list <- lapply(m_files, terra::vect)
 
-# Load a raster file containing temperature data for the study area
-# Raster files store environmental data across geographical areas
+# Load a raster file containing temperature data for the study area, which stores env data across geographical areas
+
 temp <- rast(system.file("extdata", "temp.tif", package = "nichevol"))
 
 # Load a phylogenetic tree dataset that represents evolutionary relationships between species
@@ -55,13 +55,13 @@ data("tree", package = "nichevol")
 
 # Enhanced color palette using viridis
 color_palette <- viridis::viridis(20, option = "plasma")
-# Alternative color palettes
+#additional color palettes
 color_palette <- viridis::magma(20)
 color_palette <- viridis::inferno(20)
 color_palette <- colorRampPalette(c("darkblue", "blue", "green", "yellow", "red", "darkred"))(20)
 
-# Generate a table dividing temperature data into bins (ranges) for each species
-# This allows for a more structured comparison of environmental conditions
+# Generate a table dividing temperature data into bins (ranges) for each species 
+
 bin_tabl <- bin_table(Ms = m_list, occurrences = occ_list, species = "species", 
                       longitude = "x", latitude = "y", variable = temp, 
                       percentage_out = 5, n_bins = 20)  # Divides temperature values into 20 bins
@@ -69,7 +69,7 @@ bin_tabl <- bin_table(Ms = m_list, occurrences = occ_list, species = "species",
 # Ensure that the species names in the phylogenetic tree match the data table
 tree$tip.label <- rownames(bin_tabl)
 
-# Ladderize the tree to improve plotting layout
+
 tree <- ladderize(tree)
 
 # Prepare data for ancestral state reconstruction by combining tree and environmental data
@@ -97,17 +97,17 @@ create_pie_data <- function(node_data) {
 bin_tabl_matrix <- as.matrix(bin_tabl)
 s_ml_rec_matrix <- as.matrix(s_ml_rec_table)
 
-# Handle any remaining NAs in the matrices
+# deal with any remaining NAs in the matrices
 bin_tabl_matrix[is.na(bin_tabl_matrix)] <- 0
 s_ml_rec_matrix[is.na(s_ml_rec_matrix)] <- 0
 
 tip_pies <- t(apply(bin_tabl_matrix, 1, create_pie_data))
 node_pies <- t(apply(s_ml_rec_matrix, 1, create_pie_data))
 
-# Enhanced visualization with better formatting
+# Enhanced visualization w/ formatting
 png("ancestral_reconstruction_visualization.png", width = 1200, height = 800, res = 100)
 
-# Set up the plot with better margins
+# plot set up w/ better margins
 par(mar = c(5, 4, 4, 8))
 
 # Plot the tree with enhanced formatting
@@ -126,7 +126,7 @@ for(i in 1:nrow(tip_pies)) {
                        col = color_palette, border = "white", lwd = 0.5)
 }
 
-# Add pie charts at nodes with enhanced formatting
+# Add pie charts at nodes with  formatting
 for(i in 1:nrow(node_pies)) {
   x <- lastPP$xx[length(tree$tip.label) + i]
   y <- lastPP$yy[length(tree$tip.label) + i]
