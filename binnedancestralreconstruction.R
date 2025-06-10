@@ -1,15 +1,15 @@
-# Load all of the  necessary libraries 
+# load necessary libraries
 if (!requireNamespace("plotrix", quietly = TRUE)) {
   install.packages("plotrix")
 }
-library(nichevol) 
-library(terra)     
-library(ape)      
-library(geiger)    
-library(phytools)  
-library(plotrix)   
-library(viridis)   
-library(ggplot2)   
+library(nichevol)
+library(terra)
+library(ape)
+library(geiger)
+library(phytools)
+library(plotrix)
+library(viridis)
+library(ggplot2)
 
 # Enhanced error handling function (commented out for now)
 # validate_input_data <- function(occ_list, m_list, temp, tree) {
@@ -35,90 +35,71 @@ library(ggplot2)
 #   }
 # }
 
-# load the species occurrence data from the 'nichevol' package
+# load data
 data("occ_list", package = "nichevol")
-
-# find all model files in the package's extdata folder that describe ecological niches
-m_files <- list.files(system.file("extdata", package = "nichevol"), 
-                      pattern="m\\d.gpkg", full.names=TRUE)
-
-# Read these niche model files as spatial vector objects, define accessible regions to species
-
-m_list <- lapply(m_files, terra::vect)
-
-# Load a raster file containing temperature data for the study area, which stores env data across geographical areas
-
-temp <- rast(system.file("extdata", "temp.tif", package = "nichevol"))
-
-# Load a phylogenetic tree dataset that represents evolutionary relationships between species
 data("tree", package = "nichevol")
 
-# Enhanced color palette using viridis
+# get niche model files
+m_files <- list.files(system.file("extdata", package = "nichevol"), 
+                      pattern="m\\d.gpkg", full.names=TRUE)
+m_list <- lapply(m_files, terra::vect)
+
+# load temperature raster
+temp <- rast(system.file("extdata", "temp.tif", package = "nichevol"))
+
+# set up color palette
 color_palette <- viridis::viridis(20, option = "plasma")
-#additional color palettes
-color_palette <- viridis::magma(20)
-color_palette <- viridis::inferno(20)
-color_palette <- colorRampPalette(c("darkblue", "blue", "green", "yellow", "red", "darkred"))(20)
+# alternative palettes:
+# color_palette <- viridis::magma(20)
+# color_palette <- viridis::inferno(20)
+# color_palette <- colorRampPalette(c("darkblue", "blue", "green", "yellow", "red", "darkred"))(20)
 
-# Generate a table dividing temperature data into bins (ranges) for each species 
-
+# create temperature bins for each species
 bin_tabl <- bin_table(Ms = m_list, occurrences = occ_list, species = "species", 
                       longitude = "x", latitude = "y", variable = temp, 
-                      percentage_out = 5, n_bins = 20)  # Divides temperature values into 20 bins
+                      percentage_out = 5, n_bins = 20)
 
-# Ensure that the species names in the phylogenetic tree match the data table
+# match tree tip labels to data
 tree$tip.label <- rownames(bin_tabl)
-
-
 tree <- ladderize(tree)
 
-# Prepare data for ancestral state reconstruction by combining tree and environmental data
+# combine tree and environmental data
 tree_data <- treedata(tree, bin_tabl)
 
-# Perform ancestral reconstruction using the Maximum Likelihood method
-# This method estimates the most probable evolutionary changes
+# ancestral reconstruction using maximum likelihood
 table_ml_rec <- bin_ml_rec(tree_data)
-
-# Apply smoothing to Maximum Likelihood results to make trends clearer
 s_ml_rec_table <- smooth_rec(table_ml_rec)
 
-# Function to convert bin probabilities to pie chart data
+# function to convert bin probabilities to pie chart data
 create_pie_data <- function(node_data) {
-  # Convert to numeric if not already, handling NAs
   node_data <- as.numeric(node_data)
-  # Replace NAs with 0
   node_data[is.na(node_data)] <- 0
-  # Normalize the probabilities to sum to 1
   probs <- node_data / sum(node_data)
   return(probs)
 }
 
-# Create pie chart data for tips and nodes
+# prepare pie chart data
 bin_tabl_matrix <- as.matrix(bin_tabl)
 s_ml_rec_matrix <- as.matrix(s_ml_rec_table)
 
-# deal with any remaining NAs in the matrices
 bin_tabl_matrix[is.na(bin_tabl_matrix)] <- 0
 s_ml_rec_matrix[is.na(s_ml_rec_matrix)] <- 0
 
 tip_pies <- t(apply(bin_tabl_matrix, 1, create_pie_data))
 node_pies <- t(apply(s_ml_rec_matrix, 1, create_pie_data))
 
-# Enhanced visualization w/ formatting
+# create pie chart visualization
 png("ancestral_reconstruction_visualization.png", width = 1200, height = 800, res = 100)
 
-# plot set up w/ better margins
 par(mar = c(5, 4, 4, 8))
 
-# Plot the tree with enhanced formatting
 tree_plot <- plot.phylo(tree, label.offset = 0.04, type = "phylogram", 
                         direction = "rightwards", show.tip.label = TRUE, 
                         cex = 0.7, edge.width = 2)
 
-# Get coordinates
 lastPP <- get("last_plot.phylo", envir = .PlotPhyloEnv)
 
-# Add pie charts at tips with enhanced formatting
+# add pie charts at tips
 for(i in 1:nrow(tip_pies)) {
   x <- lastPP$xx[i]
   y <- lastPP$yy[i]
@@ -126,7 +107,7 @@ for(i in 1:nrow(tip_pies)) {
                        col = color_palette, border = "white", lwd = 0.5)
 }
 
-# Add pie charts at nodes with  formatting
+# add pie charts at nodes
 for(i in 1:nrow(node_pies)) {
   x <- lastPP$xx[length(tree$tip.label) + i]
   y <- lastPP$yy[length(tree$tip.label) + i]
@@ -134,7 +115,7 @@ for(i in 1:nrow(node_pies)) {
                        col = color_palette, border = "white", lwd = 0.5)
 }
 
-# Enhanced legend with better formatting
+# add legend
 legend("right", 
        legend = paste("Bin", 1:20),
        fill = color_palette,
@@ -145,7 +126,6 @@ legend("right",
        xpd = TRUE,
        inset = c(-0.2, 0))
 
-# Add title and subtitle
 title(main = "Ancestral Reconstruction of Temperature Niches",
       sub = "Maximum Likelihood Estimation with Enhanced Visualization",
       cex.main = 1.2,
@@ -153,57 +133,85 @@ title(main = "Ancestral Reconstruction of Temperature Niches",
 
 dev.off()
 
-# Print confirmation messages
-cat("\nEnhanced visualizations have been created:\n")
+cat("\nenhanced visualizations created:\n")
 cat("1. ancestral_reconstruction_visualization.png\n")
 
-# Calculate a continuous trait value for each tip and node (e.g., weighted mean of bins)
+# calculate continuous trait values (weighted mean of bins)
 get_trait_value <- function(row) {
   bins <- as.numeric(row)
   bins[is.na(bins)] <- 0
-  # Weighted mean: bin index * probability
   sum(bins * seq_along(bins)) / sum(bins)
 }
 
-# For tips
 tip_trait <- apply(bin_tabl_matrix, 1, get_trait_value)
-# For nodes (ancestral)
 node_trait <- apply(s_ml_rec_matrix, 1, get_trait_value)
 
-# Ensure tip_trait is ordered according to tree$tip.label
+# ensure tip_trait is ordered according to tree tip labels
 tip_trait_ordered <- tip_trait[tree$tip.label]
 
-# Enhanced continuous trait visualization
+# create continuous trait visualization
 png("ancestral_state_contmap.png", width = 1200, height = 800, res = 100)
 
-# Reset graphical parameters for a clean plot
-par(mfrow=c(1,1)) # Set to single plot layout
-par(mar=c(5,4,4,2)+0.1) # Default margins plus a little padding
+par(mfrow=c(1,1))
+par(mar=c(8,4,4,2)+0.1)
 
-# Create and plot the continuous trait map with enhanced formatting
-# Pass the ordered tip_trait to contMap and explicitly set the type and direction
+# create and plot continuous trait map
 contmap_obj <- phytools::contMap(tree, tip_trait_ordered, plot=FALSE, type="phylogram", direction="rightwards")
-# Set the color palette for the contMap to match the example image (red-orange-yellow-green-blue gradient)
-contmap_obj$cols <- colorRampPalette(c("red", "yellow", "green", "blue"))(1000) # Custom color ramp for red-to-blue
+contmap_obj$cols <- colorRampPalette(c("red", "orange", "yellow", "green", "blue"))(1000)
 
-# Plot the contMap with enhanced visibility parameters and simplified label handling
-plot(contmap_obj, 
-     legend=0.7*max(nodeHeights(tree)), 
-     fsize=0.8, # Slightly increased font size for better visibility of tip labels
-     outline=TRUE, 
-     lwd=2,
-     type="phylogram",  
+plot(contmap_obj,
+     legend=FALSE,
+     fsize=0.8,
+     outline=TRUE,
+     lwd=4,
+     type="phylogram",
      direction="rightwards")
 
-# Add title and subtitle
 title(main = "Ancestral State Reconstruction: Temperature",
       sub = "Continuous Trait Evolution with Enhanced Visualization",
       cex.main = 1.2,
       cex.sub = 0.8)
 
+# add custom horizontal legend
+usr <- par("usr")
+x_range <- usr[2] - usr[1]
+y_range <- usr[4] - usr[3]
+
+min_trait_val <- min(tip_trait_ordered, na.rm = TRUE)
+max_trait_val <- max(tip_trait_ordered, na.rm = TRUE)
+
+legend_x_start <- usr[1] + x_range * 0.25
+legend_x_end <- usr[1] + x_range * 0.75
+legend_y_bottom_bar <- usr[3] - y_range * 0.15
+legend_y_top_bar <- legend_y_bottom_bar + y_range * 0.02
+
+legend_labels_values <- c(sprintf("%.1f", min_trait_val), sprintf("%.1f", max_trait_val))
+
+plotrix::color.legend(xl = legend_x_start,
+                      yb = legend_y_bottom_bar,
+                      xr = legend_x_end,
+                      yt = legend_y_top_bar,
+                      legend = legend_labels_values,
+                      cols = contmap_obj$cols,
+                      gradient = "x",
+                      align = "rb",
+                      cex = 0.8,
+                      xpd = TRUE)
+
+text(x = mean(c(legend_x_start, legend_x_end)),
+     y = legend_y_bottom_bar - (y_range * 0.04),
+     labels = "trait value",
+     cex = 0.8,
+     xpd = TRUE)
+
+text(x = mean(c(legend_x_start, legend_x_end)),
+     y = legend_y_bottom_bar - (y_range * 0.07),
+     labels = "length=0.7",
+     cex = 0.8,
+     xpd = TRUE)
+
 dev.off()
 
-cat("\nEnhanced visualizations have been created:\n")
 cat("2. ancestral_state_contmap.png\n")
 
 # Data format validation function (commented out)
@@ -222,41 +230,3 @@ cat("2. ancestral_state_contmap.png\n")
 #   }
 #   return(data)
 # }
-
-# --- Diagnostic Code for contMap (Commented Out) ---
-# This section is for troubleshooting if contMap visualization is still problematic.
-# Uncomment and run this section to test basic contMap functionality.
-
-# # Simulate a simple tree and trait data
-# set.seed(123) # for reproducibility
-# simple_tree <- rtree(5)
-# simple_trait <- setNames(rnorm(Ntip(simple_tree)), simple_tree$tip.label)
-
-# # Create a simple contMap object
-# simple_contmap_obj <- phytools::contMap(simple_tree, simple_trait, plot=FALSE, type="phylogram", direction="rightwards")
-# simple_contmap_obj$cols <- viridis::viridis(100) # Use a simple color palette
-
-# # Plot the simple contMap
-# png("simple_contmap_diagnostic.png", width = 800, height = 600, res = 100)
-# par(mfrow=c(1,1))
-# par(mar=c(5,4,4,2)+0.1)
-# plot(simple_contmap_obj, 
-#      legend=0.7*max(nodeHeights(simple_tree)), 
-#      fsize=0.8, 
-#      outline=FALSE,
-#      lwd=3,
-#      type="phylogram", 
-#      direction="rightwards")
-# title(main = "Simple contMap Diagnostic Plot", cex.main = 1.2)
-# dev.off()
-# cat("\nSimple contMap diagnostic plot created: simple_contmap_diagnostic.png\n")
-
-# # Check tree properties (for your actual tree)
-# cat("\n--- Original Tree Properties ---\n")
-# cat("Is tree rooted? ", is.rooted(tree), "\n")
-# cat("Is tree ultrametric? ", is.ultrametric(tree), "\n")
-# cat("Has edge lengths? ", !is.null(tree$edge.length), "\n")
-# cat("Number of tips: ", Ntip(tree), "\n")
-# cat("Number of nodes: ", Nnode(tree), "\n")
-
-# --- End Diagnostic Code ---
