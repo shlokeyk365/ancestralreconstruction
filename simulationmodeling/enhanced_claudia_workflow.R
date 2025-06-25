@@ -7,7 +7,7 @@
 library(mvMORPH)
 library(geiger)
 library(plotrix)
-# note the cat systems are for printing into the console for testing
+# note the cat statements are for printing into the console for testing
 # ============
 # ORIGINAL FUNCTIONS (from Claudia project) - UNCHANGED
 # =====================================
