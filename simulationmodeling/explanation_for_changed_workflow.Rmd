@@ -1,78 +1,80 @@
-# Changed Claudia Workflow: Realistic Species Distribution Simulation
+# Enhanced Claudia Workflow: Realistic Species Distribution Simulation
 
 ## Overview
-
-This script (`enhanced_claudia_workflow.R`) is an version of the original Claudia workflow for simulating and visualizing species distributions with some additional contributions. It follows the same step by step process as the original but incorporates more realistic ecological and evolutionary assumptions, resulting in more biologically plausible species occurrence patterns.
+This script (`enhanced_claudia_workflow.R`) is an improved version of the original Claudia workflow for simulating and visualizing species distributions. It follows the **same step-by-step process** as the original `Claudiatools.Rmd` but incorporates more realistic ecological and evolutionary assumptions, resulting in more biologically plausible species occurrence patterns.
 
 ## Workflow Steps
-
 The script follows these main steps:
 
-1.  **Simulate a phylogeny** using a birth-death process (Brownian motion tree)
-2.  **Simulate species niche traits** (center, width, height) for multiple environmental variables, using realistic trait correlations and evolutionary rates
-3.  **Generate environmental gradients** (temperature, precipitation, elevation, soil pH, vegetation cover) with realistic spatial patterns
-4.  **Scale and center environmental variables**
-5.  **Calculate species occurrence probabilities** across the landscape, using logistic regression and trait-environment relationships
-6.  **Plot species occurrence maps** for multiple species (same style as original Claudia workflow)
-7.  **Analyze and plot species richness and latitudinal diversity gradients**
+1. **Simulate a phylogeny** using a birth-death process (Brownian motion tree)
+2. **Simulate species niche traits** (center, width, height) for multiple environmental variables, using realistic trait correlations and evolutionary rates
+3. **Generate environmental gradients** (temperature, precipitation, elevation, soil pH, vegetation cover) with realistic spatial patterns
+4. **Scale and center environmental variables**
+5. **Align trait centers to environmental means, scale and clamp to [-3, 3]**
+6. **Clamp niche widths to a minimum of 1.0**
+7. **Calculate species occurrence probabilities** across the landscape, using logistic regression with a gentler slope (-1) and trait-environment relationships
+8. **Diagnostic output for trait/environment alignment**
+9. **Plot species occurrence maps** for multiple species (same style as original Claudia workflow)
+10. **Analyze and plot species richness and latitudinal diversity gradients**
 
 ## Key Enhancements Over the Original Claudia Workflow
 
-| Feature | Original Claudia | Enhanced Workflow |
-|-------------------------|--------------------|---------------------------|
-| Trait correlations | Uncorrelated | Realistic, theory-based |
-| Evolutionary rates | Same for all variables | Variable |
-| Environmental gradients | Simple linear/noisy | Realistic, spatially structured |
-| Occurrence calculation | Simple sum | Still simple, but with noise and height averaging |
-| Height treatment | Same for all variables | Varies by environmental variable |
-| Plotting & workflow | Classic Claudia style | Same style |
+| Feature                        | Original Claudia         | Enhanced Workflow                |
+|--------------------------------|-------------------------|----------------------------------|
+| Trait correlations             | Simple/uncorrelated     | Realistic, theory-based          |
+| Evolutionary rates             | Same for all variables  | Variable by ecological importance, lower for centers |
+| Trait center initialization    | Arbitrary/zero          | Set to environmental means       |
+| Trait center scaling/clamping  | None                    | Scaled to env, clamped to [-3, 3]|
+| Niche width treatment          | Unconstrained           | Clamped to [1.0, 2.5]            |
+| Environmental gradients        | Simple linear/noisy     | Realistic, spatially structured  |
+| Occurrence calculation         | Simple sum              | Weighted, gentler logistic slope, with noise |
+| Height treatment               | Same for all variables  | Varies by environmental variable |
+| Plotting & workflow            | Classic Claudia style   | Same, but with more realism      |
+| Diagnostics                    | None                    | Trait/environment alignment output|
 
 ### Ecological Theory Behind Trait Correlations
-
--   **Specialist–Generalist Trade-off:** Negative correlation between niche center and width
--   **Performance–Breadth Trade-off:** Negative correlation between width and height
--   **Niche Conservatism:** Weak/neutral correlation between center and height
+- **Specialist–Generalist Trade-off:** Negative correlation between niche center and width
+- **Performance–Breadth Trade-off:** Negative correlation between width and height
+- **Niche Conservatism:** Weak/neutral correlation between center and height
 
 These are reflected in the correlation matrix used for trait simulation.
 
 ## How to Use
 
-1.  **Install required packages:**
+1. **Install required packages:**
+   ```r
+   install.packages(c("mvMORPH", "geiger", "plotrix", "corpcor"))
+   ```
+2. **Run the script in R or RStudio:**
+   ```r
+   source("enhanced_claudia_workflow.R")
+   ```
+   This will generate all plots and print progress to the console, including diagnostic output for trait/environment alignment.
 
-    ``` r
-    install.packages(c("mvMORPH", "geiger", "plotrix", "corpcor"))
-    ```
-
-2.  **Run the script in R or RStudio:**
-
-    ``` r
-    source("enhanced_claudia_workflow.R")
-    ```
-
-    This will generate all plots and print progress to the console.
-
-3.  **View the plots:**
-
-    -   Environmental gradients (temperature, precipitation, etc.)
-    -   Species occurrence maps for 9 species
-    -   Species richness and latitudinal diversity gradient
+3. **View the plots:**
+   - Environmental gradients (temperature, precipitation, etc.)
+   - Species occurrence maps for 9 species
+   - Species richness and latitudinal diversity gradient
 
 ## Output
-
--   **Plots**: Maps of environmental gradients, species occurrences, and richness
--   **Console output**: Progress messages for each step
+- **Plots**: Maps of environmental gradients, species occurrences, and richness
+- **Console output**: Progress messages and diagnostics for each step
 
 ## Customization
+- **Change the number of species**: Edit `n=100` in the phylogeny simulation
+- **Change environmental resolution**: Edit the `lat` and `long` sequences
+- **Adjust trait correlations or evolutionary rates**: Edit the `corSig` matrix and `R_sd_*` vectors
+- **Modify noise or interaction strength**: Edit the `noise_level` or add more complexity to the occurrence calculation
 
--   **Change the number of species**: Edit `n=100` in the phylogeny simulation
--   **Change environmental resolution**: Edit the `lat` and `long` sequences
--   **Adjust trait correlations or evolutionary rates**: Edit the `corSig` matrix and `R_sd_*` vectors
--   **Modify noise or interaction strength**: Edit the `noise_level` or add more complexity to the occurrence calculation
+## Interpretation and Diagnostics
+- The workflow now prints the range of trait centers (after scaling) and the corresponding environmental variable ranges, so you can verify trait-environment alignment.
+- Occurrence probability maps should show structured, non-random patterns reflecting ecological filtering.
+- If you see only noise, check the diagnostic output and adjust trait simulation or scaling as needed.
 
 ## References
+- Levins, R. (1968). *Evolution in Changing Environments*.
+- Futuyma, D. J., & Moreno, G. (1988). The evolution of ecological specialization. *Annual Review of Ecology and Systematics*, 19, 207-233.
+- Sexton, J. P., et al. (2017). Evolution of ecological niche breadth. *Annual Review of Ecology, Evolution, and Systematics*, 48, 183-206.
 
--   Levins, R. (1968). *Evolution in Changing Environments*.
--   Futuyma, D. J., & Moreno, G. (1988). The evolution of ecological specialization. *Annual Review of Ecology and Systematics*, 19, 207-233.
--   Sexton, J. P., et al. (2017). Evolution of ecological niche breadth. *Annual Review of Ecology, Evolution, and Systematics*, 48, 183-206.
-
-## 
+## Contact
+For questions or suggestions, open an issue or contact the development team. 
