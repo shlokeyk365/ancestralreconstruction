@@ -1,17 +1,18 @@
 # Enhanced Claudia Workflow - Realistic Species Distribution Simulation
-#same process but trying to make more realistic
-# Shlok Kulkarni
-# Date: 2025-06-18
+# Follows the same process as Claudiatools.Rmd but with realistic improvements
+# Author: Enhanced simulation framework
+# Date: 2025-01-20
 
 # Required libraries
 library(mvMORPH)
 library(geiger)
 library(plotrix)
-# note the cat statements are for printing into the console for testing
-# ============
+
+# =============================================================================
 # ORIGINAL FUNCTIONS (from Claudia project) - UNCHANGED
-# =====================================
-# Function onverts center, width and height to logistic regression coefficients
+# =============================================================================
+
+# Function converts center, width and height to logistic regression coefficients
 traits2coefs <- function(traits, v=0.05){
   if (ncol(as.matrix(traits))==1){
     theta=traits[[1]]
@@ -98,36 +99,33 @@ tree$tip.label <- paste("sp", 1:100, sep="")
 tree$edge.length <- tree$edge.length/max(branching.times(tree))*100 #Rescale tree to 100 my
 plot(tree, main="Phylogenetic Tree")
 
-## Step 2: Enhanced trait simulation 
+## Step 2: Enhanced trait simulation (improved from Claudia)
 cat("Step 2: Simulating realistic traits...\n")
 
 # ENHANCEMENT 1: More realistic correlation structure
 # Original Claudia: Simple correlation matrix
-# Enhanced: Realistic correlations based on trait correlations
+# Enhanced: Realistic correlations based on ecological theory
 corSig <- matrix(c(1, -0.4, 0.1,    # center-width-height correlations
-                   -0.4, 1, -0.2,    #values for trade offs
+                   -0.4, 1, -0.2,    # specialists vs generalists trade-off
                    0.1, -0.2, 1), nrow=3, ncol=3, byrow = TRUE)
 
 # ENHANCEMENT 2: More realistic root values and evolutionary rates
-# Original Claudia: A <- c(20, 2, 0.7) - single values
-# Enhanced: Different values for different environmental contexts
-A_temperature <- c(15, 8, 0.85)      # moderate temperature preference
-A_precipitation <- c(0, 2, 0.80)     # moderate precipitation
-A_elevation <- c(0, 1.5, 0.75)       # low elevation preference
-A_soil_ph <- c(0, 1, 0.70)           # neutral pH preference
-A_vegetation <- c(0, 1.2, 0.80)      # moderate vegetation
+# Set root trait centers to the mean of each environmental variable
+A_temperature <- c(env_means["temperature"], 8, 0.85)      # center, width, height
+A_precipitation <- c(env_means["precipitation"], 2, 0.80)
+A_elevation <- c(env_means["elevation"], 1.5, 0.75)
+A_soil_ph <- c(env_means["soil_ph"], 1, 0.70)
+A_vegetation <- c(env_means["vegetation_cover"], 1.2, 0.80)
 
-# ENHANCEMENT 3: Different evolutionary rates for different variables
-# Original Claudia: R_sd <- c(0.5, 0.1, 0.02) - same for all
-# Enhanced: Variable rates based on ecological importance
-R_sd_temperature <- c(0.8, 0.15, 0.05)    # temperature most important
-R_sd_precipitation <- c(0.6, 0.12, 0.04)  # precipitation second
-R_sd_elevation <- c(0.7, 0.14, 0.05)      # elevation third
-R_sd_soil_ph <- c(0.4, 0.08, 0.03)        # soil pH less important
-R_sd_vegetation <- c(0.5, 0.10, 0.04)     # vegetation moderate
+# ENHANCEMENT 3: Lower evolutionary rates for trait centers to reduce variance
+R_sd_temperature <- c(0.3, 0.15, 0.05)    # center, width, height
+R_sd_precipitation <- c(0.2, 0.12, 0.04)
+R_sd_elevation <- c(0.2, 0.14, 0.05)
+R_sd_soil_ph <- c(0.15, 0.08, 0.03)
+R_sd_vegetation <- c(0.2, 0.10, 0.04)
 
 # Simulate traits for each environmental variable
-env_vars <- c("temperature", "precipitation", "elevation", "soil_ph", "vegetation")
+env_vars <- c("temperature", "precipitation", "elevation", "soil_ph", "vegetation_cover")
 A_list <- list(A_temperature, A_precipitation, A_elevation, A_soil_ph, A_vegetation)
 R_list <- list(R_sd_temperature, R_sd_precipitation, R_sd_elevation, R_sd_soil_ph, R_sd_vegetation)
 
@@ -208,6 +206,31 @@ cat("Step 4: Scaling environmental variables...\n")
 coords_scaled <- coords
 coords_scaled[,-c(1,2)] <- apply(coords_scaled[,-c(1,2)], 2, scale)
 
+# ✅ 1. Store environment scaling factors
+env_vars <- c("temperature", "precipitation", "elevation", "soil_ph", "vegetation_cover")
+env_means <- apply(coords[ , env_vars], 2, mean)
+env_sds <- apply(coords[ , env_vars], 2, sd)
+
+# After Traits is created
+# ✅ 2. Scale trait centers to match scaled environment
+for (i in seq_along(env_vars)) {
+  col_name <- paste0(env_vars[i], "_center")
+  Traits[, col_name] <- (Traits[, col_name] - env_means[i]) / env_sds[i]
+  # Clamp to -3:3
+  Traits[, col_name] <- pmin(pmax(Traits[, col_name], -3), 3)
+}
+
+# Print diagnostic ranges for trait centers and scaled environment
+cat("\nTrait center and environment diagnostics (after scaling):\n")
+for (v in env_vars) {
+  cat(v, "trait center (scaled) range:", range(Traits[, paste0(v, "_center")]), "\n")
+  cat(v, "scaled env range:", range(coords_scaled[, v]), "\n")
+}
+
+# ✅ Clamp width values to avoid overly generalist/specialist species (min 1.0)
+width_cols <- grep("_width$", colnames(Traits), value = TRUE)
+Traits[, width_cols] <- pmin(pmax(Traits[, width_cols], 1.0), 2.5)
+
 ## Step 5: Enhanced occurrence probability calculation (improved from Claudia)
 cat("Step 5: Calculating occurrence probabilities...\n")
 
@@ -230,43 +253,43 @@ calculate_realistic_occurrences <- function(coords_scaled, Traits, species_id = 
   YY <- list()
   for(k in 1:K){
     D <- cbind(1, coords_scaled[,2+k], coords_scaled[,2+k]^2)
-    Y1 <- do.call(rbind, apply(D, 1, function(x) betas[[k]]*x))
+    Y1 <- as.vector(as.matrix(D) %*% t(as.matrix(betas[[k]])))
     YY[[k]] <- Y1
   }
   
-  # Use original Claudia method as base, but with enhancements
-  YX <- apply(do.call(cbind, YY), 1, sum)
+  weights <- c(0.3, 0.25, 0.2, 0.15, 0.1)
+  prob_weighted <- as.vector(do.call(cbind, YY) %*% weights)
   
-  # Apply height constraint (use average height across environmental variables)
-  heights <- Traits[species_id, seq(3, ncol(Traits), 3)]
-  avg_height <- mean(heights)
+  # Debug: Check logistic input range before applying sigmoid
+  cat("Species", species_id, "- linear predictor range: ", range(prob_weighted), "\n")
   
-  # Convert to probabilities using original Claudia method
-  PP <- avg_height * 1/(1+exp(-YX))
+  fixed_height <- 0.95
+  # Use a gentler slope (-1) for the logistic transformation
+  PP <- fixed_height * 1 / (1 + exp(-1 * prob_weighted))
   
-  # Add small amount of noise for variation (enhancement)
   noise_level <- 0.01
   PP <- PP + rnorm(length(PP), 0, noise_level)
   
-  # Ensure probabilities are between 0 and 1
   PP <- pmax(pmin(PP, 1), 0)
   
   return(PP)
 }
 
-## Step 6: Plot occurrence probability maps (same style as Claudia)
+## Step 6: Plot occurrence probability maps (improved color scale)
 cat("Step 6: Plotting occurrence probability maps...\n")
 
+# Use heat.colors for better contrast
+library(viridis)
 par(mar=c(0,0,0,0), mfrow=c(3,3))
 for(i in 1:9){
   PP <- calculate_realistic_occurrences(coords_scaled, Traits, species_id = i)
   range(PP)
   
-  plot(coords$long, coords$lat, pch=22, bg=color.scale(PP, color.spec="rgb"), 
-       col=color.scale(PP, color.spec="rgb"), main=paste("Species", i))
+  plot(coords$long, coords$lat, pch=22, bg=viridis::viridis(100)[as.numeric(cut(PP, breaks=100))], 
+       col=viridis::viridis(100)[as.numeric(cut(PP, breaks=100))], main=paste("Species", i))
 }
 
-# Step 7: Enhanced analysis (additional to Claudia)
+## Step 7: Enhanced analysis (additional to Claudia)
 cat("Step 7: Analyzing patterns...\n")
 
 # Calculate species richness patterns
